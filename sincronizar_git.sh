@@ -1,99 +1,88 @@
 #!/bin/bash
 
-function show_menu() {
-  echo "======================"
-  echo " Git Helper Menu"
-  echo "======================"
-  echo "1. Clonar repositório (primeira vez)"
-  echo "2. Puxar atualizações (pull)"
-  echo "3. Comitar alterações"
-  echo "4. Enviar alterações (push)"
-  echo "5. Sair"
-  echo "======================"
-  read -p "Escolha uma opção: " choice
-}
-
-function clone_repo() {
-  echo ""
-  echo "🔁 CLONAR: Copia um repositório remoto pela primeira vez para sua máquina."
-  read -p "Digite a URL do repositório para clonar: " repo_url
-  git clone "$repo_url"
-}
-
-function pull_repo() {
-  echo ""
-  echo "📥 PUXAR: Atualiza o repositório local com as últimas alterações do repositório remoto."
-  git pull
-}
-
+# Função: Valida mensagem de commit conforme Conventional Commits
 function validate_commit_msg() {
   local msg="$1"
   local regex="^(feat|fix|docs|style|refactor|test|chore|build|ci|perf|revert)(\([a-zA-Z0-9_-]+\))?: .{1,72}$"
-  if [[ "$msg" =~ $regex ]]; then
-    return 0
-  else
-    return 1
-  fi
+  [[ "$msg" =~ $regex ]]
 }
 
-function commit_changes() {
-  echo ""
-  echo "💾 COMITAR: Registra as alterações locais com uma mensagem padronizada."
-
-  git status
-
-  read -p "Deseja adicionar todos os arquivos modificados? (s/n): " add_all
-  if [[ $add_all == "s" ]]; then
-    git add .
-  else
-    echo "Adicione os arquivos manualmente com 'git add <arquivo>' e tente novamente."
-    return
-  fi
-
-  echo ""
-  echo "📐 Use o formato convencional para o commit:"
-  echo "  tipo(escopo opcional): descrição"
-  echo ""
-  echo "🔧 Tipos válidos: feat, fix, docs, style, refactor, test, chore, build, ci, perf, revert"
-  echo "💡 Exemplo: feat(login): adicionar validação de token"
-
-  while true; do
-    read -p "Digite a mensagem de commit: " commit_msg
-    if validate_commit_msg "$commit_msg"; then
-      echo "✅ Mensagem válida."
-      break
-    else
-      echo "❌ Mensagem inválida. Siga o padrão: tipo(escopo opcional): descrição curta"
-    fi
-  done
-
-  read -p "Confirmar commit? (s/n): " confirm
-  if [[ $confirm == "s" ]]; then
-    git commit -m "$commit_msg"
-    echo "✅ Commit realizado com sucesso."
-  else
-    echo "❌ Commit cancelado."
-  fi
-}
-
-function push_repo() {
-  echo ""
-  echo "🚀 PUSH: Envia seus commits locais para o repositório remoto."
-  read -p "Deseja enviar para qual branch? (padrão: main): " branch
-  branch=${branch:-main}
-  git push origin "$branch"
-}
-
-# Loop principal
+# Menu principal
 while true; do
-  show_menu
+  choice=$(dialog --clear --backtitle "Git Helper com Boas Práticas" \
+    --title "Menu Principal" \
+    --menu "Escolha uma operação:" 15 60 6 \
+    1 "Clonar repositório (primeira vez)" \
+    2 "Puxar atualizações (pull)" \
+    3 "Comitar alterações (com validação)" \
+    4 "Enviar alterações (push)" \
+    5 "Sair" \
+    3>&1 1>&2 2>&3)
+
+  clear
+
   case $choice in
-    1) clone_repo ;;
-    2) pull_repo ;;
-    3) commit_changes ;;
-    4) push_repo ;;
-    5) echo "Saindo..."; exit 0 ;;
-    *) echo "Opção inválida." ;;
+    1)
+      dialog --msgbox "🔁 CLONAR:\n\nUse essa opção para clonar um repositório remoto pela primeira vez.\n\nExemplo:\nhttps://github.com/seu-usuario/seu-repo.git" 10 60
+      repo_url=$(dialog --inputbox "Informe a URL do repositório para clonar:" 8 60 3>&1 1>&2 2>&3)
+      clear
+      git clone "$repo_url"
+      read -p "Pressione ENTER para continuar..." ;;
+      
+    2)
+      dialog --msgbox "📥 PUXAR:\n\nAtualiza seu repositório local com as últimas alterações do repositório remoto.\n\nComando usado internamente:\ngit pull" 10 60
+      git pull
+      read -p "Pressione ENTER para continuar..." ;;
+      
+    3)
+      git status > /tmp/gitstatus.txt
+      dialog --textbox /tmp/gitstatus.txt 20 70
+
+      dialog --yesno "Deseja adicionar todos os arquivos modificados com 'git add .'?" 7 50
+      if [[ $? -eq 0 ]]; then
+        git add .
+      else
+        dialog --msgbox "Adicione os arquivos manualmente com:\n\n git add <arquivo>" 8 50
+        continue
+      fi
+
+      tipos="feat fix docs style refactor test chore build ci perf revert"
+      exemplos=$(cat <<EOF
+Exemplos de mensagens de commit válidas:
+
+  feat: adicionar funcionalidade X
+  fix(login): corrigir bug no login
+  docs(readme): atualizar instruções
+  refactor(core): limpar função de cálculo
+EOF
+)
+      dialog --msgbox "📐 MENSAGEM DE COMMIT\n\nFormato: <tipo>(escopo opcional): descrição curta\n\nTipos válidos:\n$tipos\n\n$exemplos" 20 70
+
+      while true; do
+        commit_msg=$(dialog --inputbox "Digite a mensagem de commit:" 8 60 3>&1 1>&2 2>&3)
+        if validate_commit_msg "$commit_msg"; then
+          dialog --msgbox "✅ Mensagem válida." 6 40
+          git commit -m "$commit_msg"
+          dialog --msgbox "✅ Commit realizado com sucesso." 6 40
+          break
+        else
+          dialog --msgbox "❌ Mensagem inválida!\n\nSiga o padrão: tipo(escopo): descrição\nExemplo: feat(login): adicionar validação" 10 60
+        fi
+      done ;;
+      
+    4)
+      dialog --msgbox "🚀 PUSH:\n\nEnvia seus commits locais para o repositório remoto.\n\nExemplo:\nmain (padrão), dev, feature/nova-tela" 10 60
+      branch=$(dialog --inputbox "Para qual branch deseja enviar? (padrão: main)" 8 50 3>&1 1>&2 2>&3)
+      branch=${branch:-main}
+      git push origin "$branch"
+      dialog --msgbox "✅ Push enviado para a branch '$branch'." 6 50 ;;
+      
+    5)
+      clear
+      echo "Saindo..."
+      exit 0 ;;
+      
+    *)
+      dialog --msgbox "❌ Opção inválida. Tente novamente." 6 40 ;;
   esac
-  echo ""
 done
