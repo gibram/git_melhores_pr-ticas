@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# Limpeza garantida na saída do script, inclusive em SIGINT (Ctrl+C)
+cleanup() {
+  dialog --clear
+  reset
+  clear
+}
+trap cleanup EXIT
+
 # Função: Valida mensagem de commit conforme Conventional Commits
 function validate_commit_msg() {
   local msg="$1"
@@ -78,9 +86,10 @@ EOF
       dialog --msgbox "✅ Push enviado para a branch '$branch'." 6 50 ;;
       
     5)
-      clear
-      echo "Saindo..."
+      dialog --infobox "Encerrando..." 3 30
+      sleep 1
       exit 0 ;;
+
       
     *)
       dialog --msgbox "❌ Opção inválida. Tente novamente." 6 40 ;;
